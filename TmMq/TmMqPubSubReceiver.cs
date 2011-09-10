@@ -16,7 +16,7 @@ namespace TmMq
             : base( queueName )
         {
             KeepAlive( null );
-            m_timer = new Timer( KeepAlive, null, 2000, 2000 ); //TODO configure keepalive seconds
+            m_timer = new Timer( KeepAlive, null, g_config.PubSubKeepAliveEveryMilliseconds, g_config.PubSubKeepAliveEveryMilliseconds );
         }
 
         protected override MongoCollection CreateMessagesCollection()

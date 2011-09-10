@@ -60,6 +60,7 @@
     <Compile Include="DynamicDictionarySerializer.cs" />
     <Compile Include="ITmMqMessage.cs" />
     <Compile Include="TmMq.cs" />
+    <Compile Include="TmMqConfig.cs" />
     <Compile Include="TmMqMessage.cs" />
     <Compile Include="TmMqMessageError.cs" />
     <Compile Include="TmMqPubSubReceiver.cs" />

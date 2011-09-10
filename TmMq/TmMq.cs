@@ -11,17 +11,17 @@ namespace TmMq
 {
     public abstract class TmMq : IDisposable
     {
+        protected static readonly TmMqConfig g_config;
         protected MongoServer m_server;
         protected readonly MongoDatabase m_db;
         private readonly ConcurrentDictionary<string, MongoCollection> m_collections = new ConcurrentDictionary<string, MongoCollection>();
         protected MongoCollection ErrorCollection { get; private set; }
         protected abstract MongoCollection MessagesCollection { get; }
 
-        private static object m_pubsubUpdateSync = new object();
+        private readonly static object g_pubsubUpdateSync = new object();
         private static bool g_pubsubUpdating;
         private static readonly Timer g_pubsubUpdateTimer;
         private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>> g_pubsubQueues = new ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>>();
-        private static readonly int g_needPubSubPingSeconds = 10;//TODO configure pubsub timeout
         private readonly MongoCollection m_configCollection;
 
         static TmMq()
@@ -34,11 +34,21 @@ namespace TmMq
                 cm.SetDiscriminator( "DynamicDictionary" );
             } );
 
-            g_pubsubUpdateTimer = new Timer( MonitorPubSubConfig, null, 15000, 4000 ); //TODO configure poll period
+            g_config = LoadConfig();
+
+            g_pubsubUpdateTimer = new Timer( MonitorPubSubConfig, null, g_config.FirstPubSubPollAfterMilliseconds, g_config.PubSubPollEveryMilliseconds );
+        }
+
+        private static TmMqConfig LoadConfig()
+        {
+            string typeName = ConfigurationManager.AppSettings["TmMq.ConfigType"] ?? "TmMq.TmMqConfig";
+            Type type = Type.GetType( typeName, true );
+
+            return (TmMqConfig)Activator.CreateInstance( type );
         }
 
         protected TmMq()
-        {
+        {    
             m_server = CreateMongoDbServer();
             m_db = m_server["tmmq"];
             ErrorCollection = GetCollection( "error" );
@@ -47,7 +57,7 @@ namespace TmMq
             m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "Type", "pubsub" ), UpdateFlags.Upsert, SafeMode.True );
 
             //Find orphaned pub/sub collections
-            lock( m_pubsubUpdateSync )
+            lock( g_pubsubUpdateSync )
             {
                 g_pubsubUpdating = true;
                 try
@@ -167,7 +177,7 @@ namespace TmMq
                     return;
                 }
 
-                lock( m_pubsubUpdateSync )
+                lock( g_pubsubUpdateSync )
                 {
                     foreach( var element in config )
                     {
@@ -190,7 +200,7 @@ namespace TmMq
 
                         DateTime at = element.Value.AsDateTime;
 
-                        if( (DateTime.UtcNow - at).TotalSeconds > g_needPubSubPingSeconds )
+                        if( (DateTime.UtcNow - at).TotalSeconds > g_config.NeedPubSubPingSeconds )
                         {
                             ConcurrentDictionary<Guid, DateTime> x;
                             g_pubsubQueues.TryRemove( name.Substring( 7 ), out x );
@@ -224,7 +234,7 @@ namespace TmMq
                         {
                             foreach( var last in queue )
                             {
-                                if( (DateTime.UtcNow - last.Value).TotalSeconds > g_needPubSubPingSeconds )
+                                if( (DateTime.UtcNow - last.Value).TotalSeconds > g_config.NeedPubSubPingSeconds )
                                 {
                                     DateTime x;
                                     queue.TryRemove( last.Key, out x );
@@ -245,6 +255,7 @@ namespace TmMq
             }
         }
 
+        //TODO consider implementing tailable cursor for a trigger
         private static void MonitorPubSubConfig_TailableCursor()
         {
             string con = ConfigurationManager.AppSettings["MongoDB.Server"];
@@ -298,7 +309,7 @@ namespace TmMq
             }
             #endregion
 
-            lock( m_pubsubUpdateSync )
+            lock( g_pubsubUpdateSync )
             {
                 ConcurrentDictionary<Guid, DateTime> subscribers;
 

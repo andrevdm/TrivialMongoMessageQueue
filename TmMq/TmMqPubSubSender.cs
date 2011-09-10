@@ -5,9 +5,7 @@ namespace TmMq
 {
     public class TmMqPubSubSender : TmMqSender
     {
-        private readonly MongoCollection m_messagesCollection;
-
-        protected override MongoCollection MessagesCollection { get { return m_messagesCollection; } }
+        protected override MongoCollection MessagesCollection { get { return null; } }
 
         public TmMqPubSubSender( string queueName )
             : base( queueName )

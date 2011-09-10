@@ -42,7 +42,7 @@ namespace TmMq
         protected virtual QueryComplete CreateActiveItemsQuery()
         {
             QueryComplete query = Query.And(
-                                            Query.LTE( "DeliveredAt", DateTime.UtcNow.AddSeconds( -2 ) ), //TODO retry after must be configurable
+                                            Query.LTE( "DeliveredAt", DateTime.UtcNow.AddSeconds( -g_config.RetryAfterSeconds ) ),
                                             Query.Or(
                                                      Query.EQ( "HoldUntil", BsonNull.Value ),
                                                      Query.LT( "HoldUntil", DateTime.UtcNow ) )
@@ -100,21 +100,21 @@ namespace TmMq
                 {
                     var msg = (TmMqMessage)BsonSerializer.Deserialize( found.ModifiedDocument, typeof( TmMqMessage ) );
 
-                    if( (msg.ExpireAt != null) && (msg.ExpireAt < DateTime.UtcNow) )
+                    if( (MongoDbQueueName != "error") && (msg.ExpireAt != null) && (msg.ExpireAt < DateTime.UtcNow) )
                     {
                         Acknowledge( msg );
                         continue;
                     }
 
-                    if( msg.RetryCount > 3 ) //TODO configure retry count
+                    if( (MongoDbQueueName != "error") && (msg.RetryCount >= g_config.MaxRetries) ) 
                     {
                         MoveToErrorQueue( msg );
                         continue;
                     }
 
-                    if( msg.DeliveryCount > 5 ) //TODO configure retry count
+                    if( msg.DeliveryCount > g_config.MaxDeliveryCount ) 
                     {
-                        MoveToErrorQueue( msg );
+                        Acknowledge( msg );
                         continue;
                     }
 
@@ -126,7 +126,7 @@ namespace TmMq
                 }
                 else
                 {
-                    Thread.Sleep( 800 ); //TODO configurable
+                    Thread.Sleep( g_config.ReceivePauseOnNoPendingMilliseconds );
                 }
             }
         }

@@ -16,29 +16,25 @@ namespace TmMqTests
         [TestInitialize]
         public void TestInitialize()
         {
-            string conStr = ConfigurationManager.AppSettings["MongoDB.Server"];
+            string conStr = ConfigurationManager.AppSettings[ "MongoDB.Server" ];
             var server = MongoServer.Create( conStr );
-            var db = server["tmmq"];
+            var db = server[ "tmmq" ];
 
-            if( db.CollectionExists( "TestSendBeforeReceiveStarted" ) )
-            {
-                db.DropCollection( "TestSendBeforeReceiveStarted" );
-            }
+            Action<string> drop = s =>
+                                      {
+                                          if( db.CollectionExists( s ) )
+                                          {
+                                              db.DropCollection( s );
+                                          }
+                                      };
 
-            if( db.CollectionExists( "TestSendAfterReceiveStarted" ) )
-            {
-                db.DropCollection( "TestSendAfterReceiveStarted" );
-            }
-
-            if( db.CollectionExists( "TestStartReceive" ) )
-            {
-                db.DropCollection( "TestStartReceive" );
-            }
-
-            if( db.CollectionExists( "TestProperties" ) )
-            {
-                db.DropCollection( "TestProperties" );
-            }
+            drop( "error" );
+            drop( "TestSendBeforeReceiveStarted" );
+            drop( "TestSendAfterReceiveStarted" );
+            drop( "TestStartReceive" );
+            drop( "TestProperties" );
+            drop( "TestRedeliver" );
+            drop( "TestErrorQueue" );
         }
 
         [TestMethod]
@@ -187,6 +183,97 @@ namespace TmMqTests
                 Assert.AreEqual( 10, r4.Count, "r4 - Wrong number of messages received" );
             }
         }
+        
+        [TestMethod]
+        public void TestRedeliver()
+        {
+            using( var send = new TmMqSender( "TestRedeliver" ) )
+            {
+                var msg = new TmMqMessage();
+                msg.Text = "msg1";
+                send.Send( msg );
+            }
+
+            using( var recv = new TmMqReceiver( "TestRedeliver" ) )
+            {
+                var count = recv.CountPending();
+                Assert.AreEqual( 1, count, "Should be one pending item" );
+
+                ITmMqMessage recieved = null;
+
+                int retry = 0;
+
+                using( var evt = new ManualResetEvent( false ) )
+                {
+                    recv.StartReceiving( 1, msg =>
+                                                {
+                                                    if( retry++ == 0 )
+                                                    {
+                                                        throw new Exception( "fail " + retry );
+                                                    }
+
+                                                    recieved = msg;
+                                                    evt.Set();
+                                                } );
+                    evt.WaitOne( 5000 );
+                }
+
+                Assert.IsNotNull( recieved );
+                Assert.AreEqual( "msg1", recieved.Text );
+                Assert.AreEqual( 1, recieved.Errors.Count, "An error should have been logged" );
+            }
+        }
+
+        [TestMethod]
+        public void TestErrorQueue()
+        {
+            using( var send = new TmMqSender( "TestErrorQueue" ) )
+            {
+                var msg = new TmMqMessage();
+                msg.Text = "msg1 - fail";
+                send.Send( msg );
+            }
+
+            using( var recv = new TmMqReceiver( "TestErrorQueue" ) )
+            {
+                int fail = 0;
+
+                using( var evt = new ManualResetEvent( false ) )
+                {
+                    recv.StartReceiving( 1, msg =>
+                                                {
+                                                    if( fail++ == 2 )
+                                                    {
+                                                        evt.Set();
+                                                    }
+
+                                                    throw new Exception( "fail " );
+                                                } );
+
+                    evt.WaitOne( 5000 );
+                }
+            }
+
+            using( var recv = new TmMqReceiver( "error" ) )
+            {
+                ITmMqMessage errorMsg = null;
+
+                using( var evt = new ManualResetEvent( false ) )
+                {
+                    recv.StartReceiving( 1, msg =>
+                    {
+                        errorMsg = msg;
+                        evt.Set();
+                    } );
+
+                    evt.WaitOne( 5000 );
+                }
+
+                Assert.IsNotNull( errorMsg );
+                Assert.AreEqual( "msg1 - fail", errorMsg.Text );
+                Assert.AreEqual( "TestErrorQueue", errorMsg.OriginalQueue );
+            }
+        }
 
         public TestContext TestContext { get; set; }
     }
@@ -197,5 +284,20 @@ namespace TmMqTests
         public int Prop1 { get; set; }
         public double PropD { get; set; }
         public string PropS { get; set; }
+    }
+
+    public class TmMqTestConfig : TmMqConfig
+    {
+        public TmMqTestConfig()
+        {
+            MaxRetries = 2;
+            NeedPubSubPingSeconds = 10;
+            PubSubPollEveryMilliseconds = 4000;
+            FirstPubSubPollAfterMilliseconds = 500;
+            PubSubKeepAliveEveryMilliseconds = 2000;
+            RetryAfterSeconds = 1;
+            MaxDeliveryCount = 5;
+            ReceivePauseOnNoPendingMilliseconds = 200;
+        }
     }
 }
