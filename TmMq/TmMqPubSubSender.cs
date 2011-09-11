@@ -26,8 +26,13 @@ namespace TmMq
             }
             #endregion
 
-            DistributestringMessage( MongoDbQueueName, message );
+            DistributestringMessage( MongoDbQueueName, message, true );
             return message;
+        }
+
+        public override void Send( ITmMqMessage message, bool safeSend )
+        {
+            DistributestringMessage( MongoDbQueueName, message, safeSend );
         }
     }
 }

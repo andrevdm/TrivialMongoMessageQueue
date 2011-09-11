@@ -325,7 +325,7 @@ namespace TmMq
             }
         }
 
-        protected void DistributestringMessage( string pubsubQueueName, ITmMqMessage message )
+        protected void DistributestringMessage( string pubsubQueueName, ITmMqMessage message, bool safeSend )
         {
             #region param checks
             if( pubsubQueueName == null )
@@ -346,7 +346,7 @@ namespace TmMq
                 foreach( var subscriber in subscribers.Keys )
                 {
                     var col = GetCollection( "pubsub_" + pubsubQueueName + "_" + subscriber );
-                    col.Insert( message );
+                    col.Insert( message, safeSend ? SafeMode.True : SafeMode.False );
                 }
             }
         }
