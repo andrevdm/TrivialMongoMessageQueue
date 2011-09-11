@@ -1,7 +1,7 @@
 TmMq
 =====
 
-TmMq - Trivial MongoDB Message Queue is a very simple message queuing system built on MongoDB
+TmMq - Trivial MongoDB Message Queue is a very simple .net message queuing system built on MongoDB
 
 It is not in any way meant to compete with any of the fully fledged messaging solutions (Hortet, ActiveMQ etc) but it is a nice, lightweight alternative that has proved useful to me.
 
@@ -19,6 +19,7 @@ Features
 8. Errors logged in message
 9. Dynamic properties collection
 10. Synchronous and asynchronous receive
+11. Written in C#
 
 
 TODO
