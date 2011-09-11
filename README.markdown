@@ -9,21 +9,27 @@ It is not in any way meant to compete with any of the fully fledged messaging so
 Features
 --------
 
-1. Send & receive
-2. Publish / subscribe
-3. Redeliver on error with limit on retry
-4. Limit on delivery (at-least-once delivery)
-5. Message expiry
-6. Message holding (only deliver in future)
-7. Errors logged in message
-8. Dynamic properties collection
-9. Synchronous and asynchronous receive
+1. No TmMq server
+2. Send & receive
+3. Publish / subscribe
+4. Redeliver on error with limit on retry
+5. Limit on delivery (at-least-once delivery)
+6. Message expiry
+7. Message holding (only deliver in future)
+8. Errors logged in message
+9. Dynamic properties collection
+10. Synchronous and asynchronous receive
 
 
 TODO
 -----
 1. Triggers based on tailable MongoDB cursor. I'm not sure this is necessary, I will implement it if I find I need it.
 2. More unit tests
+
+
+Licence
+--------
+FreeBSD License. See licence.txt
 
 
 Usage
