@@ -51,7 +51,7 @@ namespace TmMq
             return query;
         }
 
-        public virtual int CountPending()
+        public virtual long CountPending()
         {
             return m_messagesCollection.Count();
         }
@@ -193,12 +193,12 @@ namespace TmMq
         public bool SupportsAsyncNumberPendingQuery { get { return true; } }
         public bool SupportsSyncNumberPendingQuery { get { return true; } }
 
-        public int GetNumberOfPendingMessages()
+        public long GetNumberOfPendingMessages()
         {
             return CountPending();
         }
 
-        public void GetNumberOfPendingMessages( Action<int> continueWith, TimeSpan timeout )
+        public void GetNumberOfPendingMessages( Action<long> continueWith, TimeSpan timeout )
         {
             continueWith( GetNumberOfPendingMessages() );
         }

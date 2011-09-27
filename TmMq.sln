@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TmMqStats", "TmMqStats\TmMqStats.csproj", "{B283BBE2-11C6-48C9-8AF2-3972E1718A06}"
+EndProject
 Global
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = TmMq.vsmdi
@@ -45,6 +47,16 @@ Global
 		{A09DE700-86A3-475F-B4FD-E7F42A19EDF3}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{A09DE700-86A3-475F-B4FD-E7F42A19EDF3}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{A09DE700-86A3-475F-B4FD-E7F42A19EDF3}.Release|x86.ActiveCfg = Release|Any CPU
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Debug|x86.ActiveCfg = Debug|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Debug|x86.Build.0 = Debug|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Release|Any CPU.ActiveCfg = Release|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Release|Mixed Platforms.Build.0 = Release|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Release|x86.ActiveCfg = Release|x86
+		{B283BBE2-11C6-48C9-8AF2-3972E1718A06}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

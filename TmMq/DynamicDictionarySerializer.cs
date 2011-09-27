@@ -38,7 +38,7 @@ namespace TmMq
 
                         if( key != "_t" )
                         {
-                            dictionary.Add( key, value );
+                            dictionary.Add( key.Replace( '\x03', '.' ), value );
                         }
                     }
                     bsonReader.ReadEndDocument();
@@ -76,7 +76,7 @@ namespace TmMq
             {
                 foreach( var entry in dictionary )
                 {
-                    bsonWriter.WriteName( entry.Key );
+                    bsonWriter.WriteName( entry.Key.Replace( '.', '\x03' ) );
                     BsonSerializer.Serialize( bsonWriter, typeof( object ), entry.Value );
                 }
             }

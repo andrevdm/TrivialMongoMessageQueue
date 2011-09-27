@@ -12,8 +12,8 @@ namespace TmMq
     public abstract class TmMq : IDisposable
     {
         protected static readonly TmMqConfig g_config;
-        protected MongoServer m_server;
-        protected readonly MongoDatabase m_db;
+        private static MongoServer g_server = null;
+        protected static readonly Lazy<MongoDatabase> g_db;
         private readonly ConcurrentDictionary<string, MongoCollection> m_collections = new ConcurrentDictionary<string, MongoCollection>();
         protected MongoCollection ErrorCollection { get; private set; }
         protected abstract MongoCollection MessagesCollection { get; }
@@ -23,6 +23,8 @@ namespace TmMq
         private static readonly Timer g_pubsubUpdateTimer;
         private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>> g_pubsubQueues = new ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>>();
         private readonly MongoCollection m_configCollection;
+
+        public MongoDatabase Db { get { return g_db.Value; } }
 
         static TmMq()
         {
@@ -36,6 +38,13 @@ namespace TmMq
 
             g_config = LoadConfig();
 
+            g_db = new Lazy<MongoDatabase>( () =>
+                {
+                    var server = CreateMongoDbServer();
+                    return server["tmmq"];
+                },
+                true );
+
             g_pubsubUpdateTimer = new Timer( MonitorPubSubConfig, null, g_config.FirstPubSubPollAfterMilliseconds, g_config.PubSubPollEveryMilliseconds );
         }
 
@@ -48,9 +57,7 @@ namespace TmMq
         }
 
         protected TmMq()
-        {    
-            m_server = CreateMongoDbServer();
-            m_db = m_server["tmmq"];
+        {
             ErrorCollection = GetCollection( "error" );
             m_configCollection = GetCollection( "config" );
 
@@ -62,7 +69,7 @@ namespace TmMq
                 g_pubsubUpdating = true;
                 try
                 {
-                    foreach( var name in m_db.GetCollectionNames() )
+                    foreach( var name in Db.GetCollectionNames() )
                     {
                         if( name.StartsWith( "pubsub_" ) )
                         {
@@ -95,7 +102,7 @@ namespace TmMq
             }
         }
 
-        public MongoServer CreateMongoDbServer()
+        private static MongoServer CreateMongoDbServer()
         {
             string con = ConfigurationManager.AppSettings["MongoDB.Server"];
             return MongoServer.Create( con );
@@ -135,9 +142,9 @@ namespace TmMq
 
             if( !m_collections.TryGetValue( name, out col ) )
             {
-                if( !m_db.CollectionExists( name ) )
+                if( !Db.CollectionExists( name ) )
                 {
-                    col = m_db[name];
+                    col = Db[name];
                     col.EnsureIndex( new[] { "TimeStamp" } );
                     col.EnsureIndex( new[] { "DeliveredAt" } );
                     col.EnsureIndex( new[] { "HoldUntil" } );
@@ -147,7 +154,7 @@ namespace TmMq
                 }
                 else
                 {
-                    col = m_db[name];
+                    col = Db[name];
                 }
             }
 
@@ -165,9 +172,13 @@ namespace TmMq
 
             try
             {
-                string con = ConfigurationManager.AppSettings["MongoDB.Server"];
-                var server = MongoServer.Create( con );
-                var db = server["tmmq"];
+                if( g_server == null )
+                {
+                    string con = ConfigurationManager.AppSettings[ "MongoDB.Server" ];
+                    g_server = MongoServer.Create( con );
+                }
+
+                var db = g_server["tmmq"];
                 var configCollection = db["config"];
 
                 var config = configCollection.FindOne( Query.EQ( "Type", "pubsub" ) );
@@ -249,6 +260,10 @@ namespace TmMq
                     }
                 }
             }
+            catch( Exception ex )
+            {
+                Console.WriteLine( ex ); //TODO
+            }
             finally
             {
                 g_pubsubUpdating = false;
@@ -309,19 +324,26 @@ namespace TmMq
             }
             #endregion
 
-            lock( g_pubsubUpdateSync )
+            try
             {
-                ConcurrentDictionary<Guid, DateTime> subscribers;
-
-                if( !g_pubsubQueues.TryGetValue( pubsubQueueName, out subscribers ) )
+                lock( g_pubsubUpdateSync )
                 {
-                    subscribers = new ConcurrentDictionary<Guid, DateTime>();
-                    g_pubsubQueues[pubsubQueueName] = subscribers;
+                    ConcurrentDictionary<Guid, DateTime> subscribers;
+
+                    if( !g_pubsubQueues.TryGetValue( pubsubQueueName, out subscribers ) )
+                    {
+                        subscribers = new ConcurrentDictionary<Guid, DateTime>();
+                        g_pubsubQueues[ pubsubQueueName ] = subscribers;
+                    }
+
+                    subscribers[ subscriberName ] = DateTime.UtcNow;
+
+                    m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "pubsub_" + pubsubQueueName + "_" + subscriberName, DateTime.UtcNow ), UpdateFlags.Upsert );
                 }
-
-                subscribers[subscriberName] = DateTime.UtcNow;
-
-                m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "pubsub_" + pubsubQueueName + "_" + subscriberName, DateTime.UtcNow ), UpdateFlags.Upsert );
+            }
+            catch( Exception ex )
+            {
+                Console.WriteLine( ex ); //TODO
             }
         }
 
@@ -353,11 +375,6 @@ namespace TmMq
 
         public virtual void Dispose()
         {
-            if( m_server != null )
-            {
-                m_server.Disconnect();
-                m_server = null;
-            }
         }
     }
 }
