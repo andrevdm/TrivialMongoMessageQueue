@@ -3,12 +3,13 @@ using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
+using MongoDB.Bson.Serialization.Serializers;
 
 namespace TmMq
 {
-    public class DynamicDictionarySerializer : IBsonSerializer
+    public class DynamicDictionarySerializer : BsonBaseSerializer
     {
-        public object Deserialize( BsonReader bsonReader, Type nominalType, IBsonSerializationOptions options )
+        public override object Deserialize( BsonReader bsonReader, Type nominalType, IBsonSerializationOptions options )
         {
             BsonType bsonType = bsonReader.CurrentBsonType;
 
@@ -27,7 +28,7 @@ namespace TmMq
 
                     bsonReader.ReadStartDocument();
 
-                    IDiscriminatorConvention valueDiscriminatorConvention = BsonDefaultSerializer.LookupDiscriminatorConvention( typeof( object ) );
+                    IDiscriminatorConvention valueDiscriminatorConvention = BsonSerializer.LookupDiscriminatorConvention( typeof( object ) );
 
                     while( bsonReader.ReadBsonType() != BsonType.EndOfDocument )
                     {
@@ -54,17 +55,12 @@ namespace TmMq
             return result;
         }
 
-        public object Deserialize( BsonReader bsonReader, Type nominalType, Type actualType, IBsonSerializationOptions options )
+        public override object Deserialize( BsonReader bsonReader, Type nominalType, Type actualType, IBsonSerializationOptions options )
         {
             return this.Deserialize( bsonReader, nominalType, options );
         }
 
-        public bool GetDocumentId( object document, out object id, out Type idNominalType, out IIdGenerator idGenerator )
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Serialize( BsonWriter bsonWriter, Type nominalType, object value, IBsonSerializationOptions options )
+        public override void Serialize( BsonWriter bsonWriter, Type nominalType, object value, IBsonSerializationOptions options )
         {
             var dictionary = (DynamicDictionary)value;
 
@@ -82,11 +78,6 @@ namespace TmMq
             }
 
             bsonWriter.WriteEndDocument();
-        }
-
-        public void SetDocumentId( object document, object id )
-        {
-            throw new NotImplementedException();
         }
     }
 }

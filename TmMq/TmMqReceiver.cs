@@ -39,13 +39,13 @@ namespace TmMq
             return GetCollection( MongoDbQueueName );
         }
 
-        protected virtual QueryComplete CreateActiveItemsQuery()
+        protected virtual IMongoQuery CreateActiveItemsQuery()
         {
-            QueryComplete query = Query.And(
-                                            Query.LTE( "DeliveredAt", DateTime.UtcNow.AddSeconds( -g_config.RetryAfterSeconds ) ),
-                                            Query.Or(
-                                                     Query.EQ( "HoldUntil", BsonNull.Value ),
-                                                     Query.LT( "HoldUntil", DateTime.UtcNow ) )
+            var query = Query.And(
+                Query.LTE( "DeliveredAt", DateTime.UtcNow.AddSeconds( -g_config.RetryAfterSeconds ) ),
+                Query.Or(
+                    Query.EQ( "HoldUntil", BsonNull.Value ),
+                    Query.LT( "HoldUntil", DateTime.UtcNow ) )
                 );
 
             return query;
