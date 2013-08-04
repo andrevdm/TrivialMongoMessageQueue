@@ -42,3 +42,8 @@ README.markdown.html
 StyleCop.Cache
 *.dbmdl
 output/
+
+#nuget
+packages/*
+!packages/repositories.config
+*.nupkg
