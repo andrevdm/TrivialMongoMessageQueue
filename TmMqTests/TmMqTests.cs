@@ -4,6 +4,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MongoDB.Driver;
 using TmMq;
@@ -272,6 +273,35 @@ namespace TmMqTests
                 Assert.IsNotNull( errorMsg );
                 Assert.AreEqual( "msg1 - fail", errorMsg.Text );
                 Assert.AreEqual( "TestErrorQueue", errorMsg.OriginalQueue );
+            }
+        }
+
+        [TestMethod]
+        public void TestCancelReceive()
+        {
+            var cancelSource = new CancellationTokenSource();
+            var cancelToken = cancelSource.Token;
+ 
+            var task = Task.Factory.StartNew( () =>
+            {
+                using( var recv = new TmMqReceiver( "TestCancelReceiveQueue" ) )
+                {
+                    var count = recv.CountPending();
+                    Assert.AreEqual( 0, count, "Should be no pending items" );
+
+                    string messageResult = null;
+                    recv.Receive( m => messageResult = "MessageID: " + m.MessageId, cancelToken );
+
+                    Assert.IsNull( messageResult, "Message was received, but nothing was posted?" );
+                }
+            } );
+
+            cancelSource.Cancel();
+
+            if( !task.Wait( 10000 ) )
+            {
+                //NOTE: No way to abort a task without AppDomain
+                Assert.Fail( "Receive task didn't cancel on demand (waited 10 seconds). The receive task is still running." );  
             }
         }
 

@@ -56,15 +56,20 @@ namespace TmMq
             return m_messagesCollection.Count();
         }
 
-        public virtual IEnumerable<ITmMqMessage> Receive()
+        public virtual IEnumerable<ITmMqMessage> Receive( CancellationToken? cancelToken = null )
         {
             while( m_active )
             {
                 FindAndModifyResult found = null;
 
+                if( cancelToken.HasValue && cancelToken.Value.IsCancellationRequested )
+                {
+                    yield break;
+                }
+
                 try
                 {
-                    bool skip = false;
+                    var skip = false;
 
 #if DEBUG
                     //Try to avoid exception in old versions on MongoDB while debugging
@@ -126,14 +131,20 @@ namespace TmMq
                 }
                 else
                 {
+                    if( cancelToken.HasValue && cancelToken.Value.IsCancellationRequested )
+                    {
+                        yield break;
+                    }
+
                     Thread.Sleep( g_config.ReceivePauseOnNoPendingMilliseconds );
                 }
             }
         }
 
-        public void StartReceiving( int workerPoolSize, Action<ITmMqMessage> act )
+
+        public void StartReceiving( int workerPoolSize, Action<ITmMqMessage> act, CancellationToken? cancelToken = null )
         {
-            if( m_receivingPool != null )
+            if( m_receivingPool != null || ( cancelToken.HasValue && cancelToken.Value.IsCancellationRequested ) )
             {
                 return;
             }
@@ -150,7 +161,7 @@ namespace TmMq
 
             for( int i = 0; i < workerPoolSize; ++i )
             {
-                m_receivingPool[i] = Task.Factory.StartNew( () => Receive( act ) );
+                m_receivingPool[i] = Task.Factory.StartNew( () => Receive( act, cancelToken ) );
             }
         }
 
@@ -162,9 +173,9 @@ namespace TmMq
             ErrorCollection.Insert( new TmMqMessage( msg ), SafeMode.True );
         }
 
-        private void ActOnMessages( Action<ITmMqMessage> act )
+        private void ActOnMessages( Action<ITmMqMessage> act, CancellationToken? cancelToken = null )
         {
-            foreach( var msg in Receive() )
+            foreach( var msg in Receive( cancelToken ) )
             {
                 try
                 {
@@ -178,9 +189,9 @@ namespace TmMq
             }
         }
 
-        public virtual void Receive( Action<ITmMqMessage> act )
+        public virtual void Receive( Action<ITmMqMessage> act, CancellationToken? cancelToken = null )
         {
-            ActOnMessages( act );
+            ActOnMessages( act, cancelToken );
         }
 
         public override void Dispose()
