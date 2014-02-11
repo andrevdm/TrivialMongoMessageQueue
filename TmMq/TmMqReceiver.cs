@@ -13,12 +13,12 @@ namespace TmMq
     {
         private bool m_active = true;
         private Task[] m_receivingPool;
-        private readonly MongoCollection m_messagesCollection;
+        private readonly Lazy<MongoCollection> m_messagesCollection;
         private readonly object m_syncReceivingPool = new object();
 
         public string MongoDbQueueName { get; private set; }
         public string QueueName { get; private set; }
-        protected override MongoCollection MessagesCollection { get { return m_messagesCollection; } }
+        protected override MongoCollection MessagesCollection { get { return m_messagesCollection.Value; } }
 
         public TmMqReceiver( string queueName )
         {
@@ -31,7 +31,7 @@ namespace TmMq
 
             QueueName = queueName;
             MongoDbQueueName = queueName.Replace( ".", "~" );
-            m_messagesCollection = CreateMessagesCollection();
+            m_messagesCollection = new Lazy<MongoCollection>( CreateMessagesCollection, true );
         }
 
         protected virtual MongoCollection CreateMessagesCollection()
@@ -53,7 +53,7 @@ namespace TmMq
 
         public virtual long CountPending()
         {
-            return m_messagesCollection.Count();
+            return MessagesCollection.Count();
         }
 
         public virtual IEnumerable<ITmMqMessage> Receive( CancellationToken? cancelToken = null )
@@ -75,7 +75,7 @@ namespace TmMq
                     //Try to avoid exception in old versions on MongoDB while debugging
                     if( System.Diagnostics.Debugger.IsAttached )
                     {
-                        if( m_messagesCollection.FindOneAs<BsonDocument>( CreateActiveItemsQuery() ) == null )
+                        if( MessagesCollection.FindOneAs<BsonDocument>( CreateActiveItemsQuery() ) == null )
                         {
                             skip = true;
                         }
@@ -84,7 +84,7 @@ namespace TmMq
 
                     if( !skip )
                     {
-                        found = m_messagesCollection.FindAndModify(
+                        found = MessagesCollection.FindAndModify(
                                                                    CreateActiveItemsQuery(),
                                                                    SortBy.Ascending( "TimeStamp" ),
                                                                    Update.Set( "DeliveredAt", DateTime.UtcNow ),
@@ -123,7 +123,7 @@ namespace TmMq
                         continue;
                     }
 
-                    m_messagesCollection.Update(
+                    MessagesCollection.Update(
                                  Query.EQ( "MessageId", msg.MessageId ),
                                  Update.Inc( "DeliveryCount", 1 ) );
 
@@ -167,7 +167,7 @@ namespace TmMq
 
         private void MoveToErrorQueue( TmMqMessage msg )
         {
-            m_messagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.True );
+            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.True );
 
             msg.OriginalQueue = MongoDbQueueName;
             ErrorCollection.Insert( new TmMqMessage( msg ), SafeMode.True );
