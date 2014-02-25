@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Threading;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 
@@ -115,7 +116,7 @@ namespace TmMq
 
         public void Acknowledge( ITmMqMessage msg )
         {
-            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.False );
+            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.True );
         }
 
         public void Fail( ITmMqMessage msg, Exception exception )

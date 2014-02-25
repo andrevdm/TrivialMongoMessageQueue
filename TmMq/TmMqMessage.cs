@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace TmMq
 {
@@ -44,9 +45,11 @@ namespace TmMq
         }
 
         public ObjectId Id { get; private set; }
+        [BsonRepresentation( BsonType.Binary )]
         public Guid MessageId { get; private set; }
         public DateTime TimeStamp { get; private set; }
         public DateTime DeliveredAt { get; private set; }
+        [BsonRepresentation( BsonType.Binary )]
         public Guid CorrelationId { get; private set; }
         public int RetryCount { get; private set; }
         public int DeliveryCount { get; private set; }
