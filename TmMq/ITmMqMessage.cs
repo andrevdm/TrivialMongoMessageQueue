@@ -5,10 +5,10 @@ namespace TmMq
 {
     public interface ITmMqMessage
     {
-        Guid MessageId { get; }
+        string MessageId { get; }
         DateTime TimeStamp { get; }
         DateTime DeliveredAt { get; }
-        Guid CorrelationId { get; }
+        string CorrelationId { get; }
         int RetryCount { get; }
         int DeliveryCount { get; }
         string Type { get; set; }

@@ -10,7 +10,7 @@ namespace TmMq
     {
         public TmMqMessage()
         {
-            MessageId = Guid.NewGuid();
+            MessageId = Guid.NewGuid().ToString();
             Properties = new DynamicDictionary();
             Errors = new List<TmMqMessageError>();
             TimeStamp = DateTime.UtcNow;
@@ -45,12 +45,10 @@ namespace TmMq
         }
 
         public ObjectId Id { get; private set; }
-        [BsonRepresentation( BsonType.String )]
-        public Guid MessageId { get; private set; }
+        public string MessageId { get; private set; }
         public DateTime TimeStamp { get; private set; }
         public DateTime DeliveredAt { get; private set; }
-        [BsonRepresentation( BsonType.String )]
-        public Guid CorrelationId { get; private set; }
+        public string CorrelationId { get; private set; }
         public int RetryCount { get; private set; }
         public int DeliveryCount { get; private set; }
         public string Type { get; set; }
