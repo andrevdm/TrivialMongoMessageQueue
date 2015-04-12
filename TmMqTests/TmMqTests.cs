@@ -18,7 +18,8 @@ namespace TmMqTests
         public void TestInitialize()
         {
             string conStr = ConfigurationManager.AppSettings[ "MongoDB.Server" ];
-            var server = MongoServer.Create( conStr );
+            var client = new MongoClient( conStr );
+            var server = client.GetServer();
             var db = server[ "tmmq" ];
 
             Action<string> drop = s =>

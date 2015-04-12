@@ -167,10 +167,10 @@ namespace TmMq
 
         private void MoveToErrorQueue( TmMqMessage msg )
         {
-            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.True );
+            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), WriteConcern.Acknowledged );
 
             msg.OriginalQueue = MongoDbQueueName;
-            ErrorCollection.Insert( new TmMqMessage( msg ), SafeMode.True );
+            ErrorCollection.Insert( new TmMqMessage( msg ), WriteConcern.Acknowledged );
         }
 
         private void ActOnMessages( Action<ITmMqMessage> act, CancellationToken? cancelToken = null )

@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System;                                                                                             
 using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Bson.Serialization;
@@ -7,10 +7,11 @@ using MongoDB.Bson.Serialization.Serializers;
 
 namespace TmMq
 {
-    public class DynamicDictionarySerializer : BsonBaseSerializer
+    public class DynamicDictionarySerializer : IBsonSerializer
     {
-        public override object Deserialize( BsonReader bsonReader, Type nominalType, IBsonSerializationOptions options )
+        public object Deserialize( BsonDeserializationContext context, BsonDeserializationArgs args )
         {
+            var bsonReader = context.Reader;
             BsonType bsonType = bsonReader.CurrentBsonType;
 
             object result;
@@ -35,7 +36,7 @@ namespace TmMq
                         string key = bsonReader.ReadName();
                         Type valueType = valueDiscriminatorConvention.GetActualType( bsonReader, typeof( object ) );
                         IBsonSerializer valueSerializer = BsonSerializer.LookupSerializer( valueType );
-                        object value = valueSerializer.Deserialize( bsonReader, typeof( object ), valueType, null );
+                        object value = valueSerializer.Deserialize( context );
 
                         if( key != "_t" )
                         {
@@ -47,7 +48,7 @@ namespace TmMq
                 }
                 else
                 {
-                    string message = string.Format( "Can't deserialize a {0} from BsonType {1}.", nominalType.FullName, bsonType );
+                    string message = string.Format( "Can't deserialize a {0} from BsonType {1}.", context.Reader.CurrentBsonType, bsonType );
                     throw new BsonException( message );
                 }
             }
@@ -55,15 +56,11 @@ namespace TmMq
             return result;
         }
 
-        public override object Deserialize( BsonReader bsonReader, Type nominalType, Type actualType, IBsonSerializationOptions options )
-        {
-            return this.Deserialize( bsonReader, nominalType, options );
-        }
-
-        public override void Serialize( BsonWriter bsonWriter, Type nominalType, object value, IBsonSerializationOptions options )
+        public void Serialize( BsonSerializationContext context, BsonSerializationArgs args, object value )
         {
             var dictionary = (DynamicDictionary)value;
 
+            var bsonWriter = context.Writer;
             bsonWriter.WriteStartDocument();
 
             bsonWriter.WriteString( "_t", "DynamicDictionary" );
@@ -78,6 +75,11 @@ namespace TmMq
             }
 
             bsonWriter.WriteEndDocument();
+        }
+
+        public Type ValueType
+        {
+            get { throw new NotImplementedException(); }
         }
     }
 }

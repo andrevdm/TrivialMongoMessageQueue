@@ -13,13 +13,14 @@ namespace TmMq
     public abstract class TmMq : IDisposable
     {
         protected static readonly TmMqConfig g_config;
-        private static MongoServer g_server = null;
+        protected static readonly Lazy<MongoServer> g_server;
         protected static readonly Lazy<MongoDatabase> g_db;
         private readonly ConcurrentDictionary<string, MongoCollection> m_collections = new ConcurrentDictionary<string, MongoCollection>();
         protected MongoCollection ErrorCollection { get; private set; }
         protected abstract MongoCollection MessagesCollection { get; }
 
         private readonly static object g_pubsubUpdateSync = new object();
+        private static MongoClient g_client = null;
         private static bool g_pubsubUpdating;
         private static readonly Timer g_pubsubUpdateTimer;
         private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>> g_pubsubQueues = new ConcurrentDictionary<string, ConcurrentDictionary<Guid, DateTime>>();
@@ -39,12 +40,16 @@ namespace TmMq
 
             g_config = LoadConfig();
 
-            g_db = new Lazy<MongoDatabase>( () =>
-                {
-                    var server = CreateMongoDbServer();
-                    return server["tmmq"];
-                },
-                true );
+
+            g_server = new Lazy<MongoServer>( () =>
+            {
+                var client = CreateMongoClient();
+                var server = client.GetServer();
+                return server;
+            },
+            true );
+
+            g_db = new Lazy<MongoDatabase>( () => g_server.Value.GetDatabase( "tmmq" ), true );
 
             g_pubsubUpdateTimer = new Timer( MonitorPubSubConfig, null, g_config.FirstPubSubPollAfterMilliseconds, g_config.PubSubPollEveryMilliseconds );
         }
@@ -62,7 +67,7 @@ namespace TmMq
             ErrorCollection = GetCollection( "error" );
             m_configCollection = GetCollection( "config" );
 
-            m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "Type", "pubsub" ), UpdateFlags.Upsert, SafeMode.True );
+            m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "Type", "pubsub" ), UpdateFlags.Upsert, WriteConcern.Acknowledged );
 
             //Find orphaned pub/sub collections
             lock( g_pubsubUpdateSync )
@@ -103,10 +108,11 @@ namespace TmMq
             }
         }
 
-        private static MongoServer CreateMongoDbServer()
+        private static MongoClient CreateMongoClient()
         {
             string con = ConfigurationManager.AppSettings["MongoDB.Server"];
-            return MongoServer.Create( con );
+            var client = new MongoClient( con );
+            return client;
         }
 
         public ITmMqMessage CreateMessage()
@@ -116,7 +122,7 @@ namespace TmMq
 
         public void Acknowledge( ITmMqMessage msg )
         {
-            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), SafeMode.True );
+            MessagesCollection.Remove( Query.EQ( "MessageId", msg.MessageId ), WriteConcern.Acknowledged );
         }
 
         public void Fail( ITmMqMessage msg, Exception exception )
@@ -173,14 +179,14 @@ namespace TmMq
 
             try
             {
-                if( g_server == null )
+                if( g_client == null )
                 {
-                    string con = ConfigurationManager.AppSettings[ "MongoDB.Server" ];
-                    g_server = MongoServer.Create( con );
+                    string con = ConfigurationManager.AppSettings["MongoDB.Server"];
+                    g_client = new MongoClient( con );
                 }
 
-                var db = g_server["tmmq"];
-                var configCollection = db["config"];
+                var db = GetDatabase( "tmmq" );
+                var configCollection = db.GetCollection<BsonDocument>( "config" );
 
                 var config = configCollection.FindOne( Query.EQ( "Type", "pubsub" ) );
 
@@ -271,49 +277,9 @@ namespace TmMq
             }
         }
 
-        //TODO consider implementing tailable cursor for a trigger
-        private static void MonitorPubSubConfig_TailableCursor()
+        private static MongoDatabase GetDatabase( string name )
         {
-            string con = ConfigurationManager.AppSettings["MongoDB.Server"];
-            var server = MongoServer.Create( con );
-            var db = server["local"];
-            var oplog = db["oplog.rs"];
-            BsonTimestamp lastTs = BsonTimestamp.Create( 0 );
-
-            while( true )
-            {
-                var query = Query.GT( "ts", lastTs );
-
-                var cursor = oplog.Find( query )
-                        .SetFlags( QueryFlags.TailableCursor | QueryFlags.AwaitData )
-                        .SetSortOrder( "$natural" );
-
-                using( var enumerator = (MongoCursorEnumerator<BsonDocument>)cursor.GetEnumerator() )
-                {
-                    while( true )
-                    {
-                        if( enumerator.MoveNext() )
-                        {
-                            var document = enumerator.Current;
-                            lastTs = document["ts"].AsBsonTimestamp;
-
-                            Console.WriteLine( document.GetValue( "op" ) );
-                            //ProcessDocument(document);
-                        }
-                        else
-                        {
-                            if( enumerator.IsDead )
-                            {
-                                break;
-                            }
-                            if( !enumerator.IsServerAwaitCapable )
-                            {
-                                Thread.Sleep( 100 );
-                            }
-                        }
-                    }
-                }
-            }
+            return g_server.Value.GetDatabase( name );
         }
 
         protected void KeepAlive( string pubsubQueueName, Guid subscriberName )
@@ -334,10 +300,10 @@ namespace TmMq
                     if( !g_pubsubQueues.TryGetValue( pubsubQueueName, out subscribers ) )
                     {
                         subscribers = new ConcurrentDictionary<Guid, DateTime>();
-                        g_pubsubQueues[ pubsubQueueName ] = subscribers;
+                        g_pubsubQueues[pubsubQueueName] = subscribers;
                     }
 
-                    subscribers[ subscriberName ] = DateTime.UtcNow;
+                    subscribers[subscriberName] = DateTime.UtcNow;
 
                     m_configCollection.Update( Query.EQ( "Type", "pubsub" ), Update.Set( "pubsub_" + pubsubQueueName + "_" + subscriberName, DateTime.UtcNow ), UpdateFlags.Upsert );
                 }
@@ -369,7 +335,7 @@ namespace TmMq
                 foreach( var subscriber in subscribers.Keys )
                 {
                     var col = GetCollection( "pubsub_" + pubsubQueueName + "_" + subscriber );
-                    col.Insert( message, safeSend ? SafeMode.True : SafeMode.False );
+                    col.Insert( message, safeSend ? WriteConcern.Acknowledged : WriteConcern.Unacknowledged );
                 }
             }
         }

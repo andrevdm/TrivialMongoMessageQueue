@@ -39,7 +39,7 @@ namespace TmMq
             }
             #endregion
 
-            m_messagesCollection.Insert( message, SafeMode.True );
+            m_messagesCollection.Insert( message, WriteConcern.Acknowledged );
             return message;
         }
 
@@ -52,7 +52,7 @@ namespace TmMq
             }
             #endregion
 
-            m_messagesCollection.Insert( message, safeSend ? SafeMode.True : SafeMode.False );
+            m_messagesCollection.Insert( message, safeSend ? WriteConcern.Acknowledged : WriteConcern.Unacknowledged );
         }
     }
 }
