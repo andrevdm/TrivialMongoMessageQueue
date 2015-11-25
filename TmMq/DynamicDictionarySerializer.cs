@@ -79,7 +79,7 @@ namespace TmMq
 
         public Type ValueType
         {
-            get { throw new NotImplementedException(); }
+            get { return typeof( DynamicDictionary ); }
         }
     }
 }
